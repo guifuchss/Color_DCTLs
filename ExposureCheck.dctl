@@ -1,0 +1,82 @@
+
+DEFINE_UI_PARAMS(p_Ramp, Ramp, DCTLUI_CHECK_BOX, 1);
+DEFINE_UI_PARAMS(p_MiddleGray, MiddleGray, DCTLUI_CHECK_BOX, 1);
+DEFINE_UI_PARAMS(p_ExposureChart, ExposureChartLinear, DCTLUI_CHECK_BOX, 1);
+DEFINE_UI_PARAMS(p_ExposureChartdwg, ExposureChartDWG, DCTLUI_CHECK_BOX, 0);
+DEFINE_UI_PARAMS(p_mid, GrayValue, DCTLUI_VALUE_BOX, 0.3360432724);
+DEFINE_UI_PARAMS(p_bars, NbarsLinear, DCTLUI_VALUE_BOX, 10);
+DEFINE_UI_PARAMS(p_maxramp, Rampsize, DCTLUI_SLIDER_FLOAT, 0.027f, 0f, 1f, 0.010f);
+DEFINE_UI_PARAMS(p_maxgray, Graysize, DCTLUI_SLIDER_FLOAT, 0.036f, 0.0f, 1f, 0.010f);
+DEFINE_UI_PARAMS(p_maxchart, Chartsize, DCTLUI_SLIDER_FLOAT, 0.936f, 0f, 1f, 0.010f);
+
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B) {
+    float3 out = make_float3(p_R, p_G, p_B); 
+    float width = (float)p_Width;
+    float height = (float)p_Height;
+    float X = (float)p_X;
+    float Y = (float)p_Y;
+    float rX = X / width;
+    float rY = Y / height;
+
+    // Define the total number of bars for the exposure chart
+    int numBars = 10; // For 10 stops of exposure
+
+    // Calculate the width of each bar based on the image width and number of bars
+    float barWidth = p_Width / float(numBars);
+
+    // Determine which bar the current pixel falls into based on its x-coordinate
+    int barIndex = int(p_X / barWidth);
+
+    // Define the DWG stops values
+    float stops[10] = {
+        0.054857, 0.092571, 0.142268, // Below middle gray
+        0.336043, // Middle gray
+        0.407200, 0.479408, 0.552154, 0.625172, 0.698327, 0.771551 // Above middle gray
+    };
+    
+
+    // Rampa
+    if(p_Ramp == 1) {
+        if (rY >= 0.0f && rY < p_maxramp) {
+            out = make_float3(rX, rX, rX);
+        }
+    }
+
+    // Middle gray 
+    if(p_MiddleGray == 1) {
+        if (rY >= (1.0f - p_maxgray) && rY <= 1.0f) {
+            out = make_float3(p_mid, p_mid, p_mid); 
+        }
+    }
+
+   // Exposure chart
+    if(p_ExposureChart == 1) {
+        const int numBars = p_bars; 
+        float barWidth = width / numBars; 
+        int barIndex = (int)(X / barWidth);
+        float normalizedValue = barIndex / (float)(numBars - 1);
+
+        if (rY >= p_maxchart && rY < 0.965f) {
+            out = make_float3(normalizedValue, normalizedValue, normalizedValue);
+        }
+    }
+
+    // Exposure chart DWG
+    if(p_ExposureChartdwg == 1) {
+        const int numBars = 10; 
+        float barWidth = width / numBars; 
+        int barIndex = (int)(X / barWidth);
+        float normalizedValuedwg = stops[barIndex] / stops[numBars - 1];
+
+         if(rY >= p_maxchart && rY < 0.965f) {
+            out = make_float3(normalizedValuedwg, normalizedValuedwg, normalizedValuedwg);
+        }
+    }
+    
+
+
+
+
+    return out;
+}
