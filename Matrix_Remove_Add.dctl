@@ -1,0 +1,40 @@
+//Created by Guilherme Fuchs
+// www.guifuchs.com
+// Input Color Space: Arri LogC
+
+DEFINE_UI_PARAMS(p_remove, MatrixRemove, DCTLUI_CHECK_BOX, 0);
+DEFINE_UI_PARAMS(p_add, MatrixArri, DCTLUI_CHECK_BOX, 0);
+
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B)
+{
+    float3 inRGB = make_float3(p_R, p_G, p_B);
+    float3 out = inRGB; 
+
+    // Initialize variables
+    float remove_r = 0.0f;
+    float remove_g = 0.0f;
+    float remove_b = 0.0f;
+
+    float add_r = 0.0f;
+    float add_g = 0.0f;
+    float add_b = 0.0f; 
+
+    if (p_remove == 1) {
+        remove_r = (p_R * 0.806165f) + (p_G * 0.168534f) + (p_B * 0.025301f);
+        remove_g = (p_R * 0.091228f) + (p_G * 0.765221f) + (p_B * 0.14355f);
+        remove_b = (p_R * 0.092241f) + (p_G * 0.251418f) + (p_B * 0.656341f);
+        out = make_float3(remove_r, remove_g, remove_b); // Only update 'out' if p_remove is 1
+    }
+
+    if (p_add == 1) {
+        add_r = (p_R * 1.271103f) + (p_G * -0.284279f) + (p_B * 0.013176f);
+        add_g = (p_R * -0.127165f) + (p_G * 1.436429f) + (p_B * -0.309264f);
+        add_b = (p_R * -0.129927f) + (p_G * -0.510286f) + (p_B * 1.640214f);
+        out = make_float3(add_r, add_g, add_b);
+
+
+    }
+
+    return out;
+}
