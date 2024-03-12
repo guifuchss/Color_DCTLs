@@ -1,0 +1,63 @@
+DEFINE_UI_PARAMS(p_Exp, exposure, DCTLUI_SLIDER_FLOAT, 0f, -10f, 10f, 0.01f);
+
+__DEVICE__ float DItoLinear(float in){
+    float DI_A = 0.0075;
+    float DI_B = 7.0;
+    float DI_C = 0.07329248;
+    float DI_M = 10.44426855;
+    float DI_LIN_CUT = 0.00262409;
+    float DI_LOG_CUT = 0.02740668;
+    float out = in;
+
+    if (in > DI_LOG_CUT) {
+        out = _powf(2.0f, (in / DI_C) - DI_B)-DI_A;
+    } else {
+        out = in/DI_M;
+    }
+
+    return out;
+           
+}
+
+__DEVICE__ float LineartoDI(float in){
+    float DI_A = 0.0075;
+    float DI_B = 7.0;
+    float DI_C = 0.07329248;
+    float DI_M = 10.44426855;
+    float DI_LIN_CUT = 0.00262409;
+    float DI_LOG_CUT = 0.02740668;
+    float out = in;
+
+    if (in > DI_LIN_CUT) {
+        out = (_log2f(in + DI_A) + DI_B)*DI_C;
+    } else { 
+        out = in*DI_M;
+    }    
+        
+    return out;
+           
+}
+
+
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B){
+    float3 in_RGB = make_float3(p_R, p_G, p_B);
+    float3 out = in_RGB;
+
+    out.x = DItoLinear(out.x);
+    out.y = DItoLinear(out.y);
+    out.z = DItoLinear(out.z);
+
+    out *= _powf(2, p_Exp);
+
+    out.x = LineartoDI(out.x);
+    out.y = LineartoDI(out.y);
+    out.z = LineartoDI(out.z);
+
+    
+    return out;
+
+}
+
+
+
