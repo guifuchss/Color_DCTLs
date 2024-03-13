@@ -5,3 +5,8 @@ This DCTL was created to be a monitoring tool. Place it before starting to devel
 Matrix_remove_add:
 
 This DCTL file offers the option to use either Arri Matrix Remove or Arri Matrix Add.
+
+Linear2DWG:
+
+This DCTL transforms to linear gamma to correct exposure. Input color space: DWG.
+
