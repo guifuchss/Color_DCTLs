@@ -1,0 +1,29 @@
+// Contrast OFX DCTL
+
+
+DEFINE_UI_PARAMS(CURVE, Contrast, DCTLUI_SLIDER_FLOAT, 0, -1, 3, 0.001)
+DEFINE_UI_PARAMS(PIVOT, GrayValue, DCTLUI_VALUE_BOX, 0.3360432724) 
+
+__DEVICE__ float clamp(float x, float lowerLimit, float upperLimit) {
+    return max(lowerLimit, min(x, upperLimit));
+}
+
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B)
+{
+    float3 RGB = make_float3(p_R, p_G, p_B);
+    CURVE = CURVE > 0.0f ? CURVE * 2.0f : CURVE;
+    CURVE += 1.0f;
+
+
+        RGB.x = RGB.x <= PIVOT ? _powf(RGB.x / PIVOT, CURVE) * PIVOT : (1.0f - _powf(1.0f - (RGB.x - PIVOT) / (1.0f - PIVOT), CURVE)) * (1.0f - PIVOT) + PIVOT;
+        RGB.y = RGB.y <= PIVOT ? _powf(RGB.y / PIVOT, CURVE) * PIVOT : (1.0f - _powf(1.0f - (RGB.y - PIVOT) / (1.0f - PIVOT), CURVE)) * (1.0f - PIVOT) + PIVOT;
+        RGB.z = RGB.z <= PIVOT ? _powf(RGB.z / PIVOT, CURVE) * PIVOT : (1.0f - _powf(1.0f - (RGB.z - PIVOT) / (1.0f - PIVOT), CURVE)) * (1.0f - PIVOT) + PIVOT;
+   
+
+    // Clamping the RGB values to the 0.0 - 1.0 range
+    RGB.x = clamp(RGB.x, 0.0f, 1.0f);
+    RGB.y = clamp(RGB.y, 0.0f, 1.0f);
+    RGB.z = clamp(RGB.z, 0.0f, 1.0f);
+
+    return RGB;
+}
