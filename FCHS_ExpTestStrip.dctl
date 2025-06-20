@@ -1,0 +1,129 @@
+// --- UI PARAMETERS ---
+DEFINE_UI_PARAMS(stripMode, test strip mode, DCTLUI_CHECK_BOX, 1)
+DEFINE_UI_PARAMS(numStrips, number of strips, DCTLUI_SLIDER_INT, 3, 1, 9, 1)
+DEFINE_UI_PARAMS(stripStopStep, stops per strip, DCTLUI_SLIDER_FLOAT, 1.0f, 0.1f, 3.0f, 0.05f)
+DEFINE_UI_PARAMS(exposureStep, exposure stops, DCTLUI_SLIDER_FLOAT, 0.0f, -5.0f, 5.0f, 0.1f) 
+DEFINE_UI_PARAMS(stripOffset, strip offset, DCTLUI_SLIDER_FLOAT, 0.0f, -1.0f, 1.0f, 0.01f)
+DEFINE_UI_PARAMS(compareExposure, before/after, DCTLUI_CHECK_BOX, 0)
+DEFINE_UI_PARAMS(compareViewOffset, compare view offset, DCTLUI_SLIDER_FLOAT, 0.0f, -1.0f, 1.0f, 0.01f)
+
+// --- UI TOOLTIPS ---
+DEFINE_UI_TOOLTIP(stripStopStep, "Sets the exposure difference in stops between each adjacent strip.")
+DEFINE_UI_TOOLTIP(exposureStep, "Applies an overall exposure compensation to the image, measured in stops.")
+DEFINE_UI_TOOLTIP(compareExposure, "Splits the screen to compare original vs. exposure-adjusted image.")
+DEFINE_UI_TOOLTIP(compareViewOffset, "When 'before/after' is active, this slider pans the comparison area left and right.")
+
+
+// --- FUNÇÕES DE CONVERSÃO (DaVinci Intermediate <-> Linear Gamma) ---
+__DEVICE__ float DItoLinear(float in){
+    float DI_A = 0.0075f;
+    float DI_B = 7.0f;
+    float DI_C = 0.07329248f;
+    float DI_M = 10.44426855f;
+    float DI_LOG_CUT = 0.02740668f;
+    float out = in;
+
+    if (in > DI_LOG_CUT) {
+        out = _powf(2.0f, (in / DI_C) - DI_B) - DI_A;
+    } else {
+        out = in / DI_M;
+    }
+    return _fmaxf(0.0f, out);
+}
+
+__DEVICE__ float LineartoDI(float in){
+    float DI_A = 0.0075f;
+    float DI_B = 7.0f;
+    float DI_C = 0.07329248f;
+    float DI_M = 10.44426855f;
+    float DI_LIN_CUT = 0.00262409f;
+    float out = in;
+    float safe_in = _fmaxf(0.0f, in);
+
+    if (safe_in > DI_LIN_CUT) {
+        out = (_log2f(safe_in + DI_A) + DI_B) * DI_C;
+    } else {
+        out = safe_in * DI_M;
+    }
+    return out;
+}
+
+
+// --- FUNÇÃO PRINCIPAL ---
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, __TEXTURE__ p_TexR, __TEXTURE__ p_TexG, __TEXTURE__ p_TexB)
+{
+    if (compareExposure == 1)
+    {
+        // --- MODO DE COMPARAÇÃO ---
+        float paneWidth = (float)p_Width / 2.0f;
+        float localX = _fmod((float)p_X, paneWidth); 
+        float offsetPixels = compareViewOffset * 0.5f * paneWidth;
+        float sampleX = ((float)p_Width * 0.5f) - (paneWidth * 0.5f) + localX + offsetPixels;
+        sampleX = _clampf(sampleX, 0.0f, (float)(p_Width - 1));
+
+        float3 sampled_color = make_float3(
+            _tex2D(p_TexR, sampleX, p_Y),
+            _tex2D(p_TexG, sampleX, p_Y),
+            _tex2D(p_TexB, sampleX, p_Y)
+        );
+
+        if ((float)p_X < paneWidth)
+        {
+            return sampled_color;
+        }
+        else
+        {
+            float3 colLinear = make_float3(DItoLinear(sampled_color.x), DItoLinear(sampled_color.y), DItoLinear(sampled_color.z));
+            colLinear *= _powf(2.0f, exposureStep);
+            float3 processed_col = make_float3(LineartoDI(colLinear.x), LineartoDI(colLinear.y), LineartoDI(colLinear.z));
+            return make_float3(_fmaxf(processed_col.x, 0.0f), _fmaxf(processed_col.y, 0.0f), _fmaxf(processed_col.z, 0.0f));
+        }
+    }
+    else
+    {
+        // --- MODO TEST STRIP ---
+        float3 col;
+
+        if (stripMode == 1)
+        {
+            float stripWidth = (float)p_Width / (float)numStrips;
+            int stripIndex = (int)((float)p_X / stripWidth);
+            stripIndex = _clampf(stripIndex, 0, numStrips - 1);
+
+            float localX = _fmod((float)p_X, stripWidth);
+            float offsetPixels = stripOffset * 0.5f * stripWidth;
+            float sampleX = (float)p_Width * 0.5f - stripWidth * 0.5f + localX + offsetPixels;
+            sampleX = _clampf(sampleX, 0.0f, (float)(p_Width - 1));
+
+            col = make_float3(
+                _tex2D(p_TexR, sampleX, p_Y),
+                _tex2D(p_TexG, sampleX, p_Y),
+                _tex2D(p_TexB, sampleX, p_Y)
+            );
+        }
+        else // stripMode == 0
+        {
+            col = make_float3(
+                _tex2D(p_TexR, p_X, p_Y),
+                _tex2D(p_TexG, p_X, p_Y),
+                _tex2D(p_TexB, p_X, p_Y)
+            );
+        }
+
+        float3 colLinear = make_float3(DItoLinear(col.x), DItoLinear(col.y), DItoLinear(col.z));
+        float totalStops = exposureStep;
+        if (stripMode == 1)
+        {
+            float stripWidth = (float)p_Width / (float)numStrips;
+            int stripIndex = (int)((float)p_X / stripWidth);
+            float centerIndex = ((float)(numStrips - 1)) * 0.5f;
+            float stopPattern = ((float)stripIndex - centerIndex) * stripStopStep;
+            totalStops += stopPattern;
+        }
+        colLinear *= _powf(2.0f, totalStops);
+        col = make_float3(LineartoDI(colLinear.x), LineartoDI(colLinear.y), LineartoDI(colLinear.z));
+        col = make_float3(_fmaxf(col.x, 0.0f), _fmaxf(col.y, 0.0f), _fmaxf(col.z, 0.0f));
+
+        return col;
+    }
+}
