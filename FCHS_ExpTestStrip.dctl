@@ -1,3 +1,7 @@
+// Created by Guilherme Fuchs
+// www.guifuchs.com
+
+
 // --- UI PARAMETERS ---
 DEFINE_UI_PARAMS(stripMode, test strip mode, DCTLUI_CHECK_BOX, 1)
 DEFINE_UI_PARAMS(numStrips, number of strips, DCTLUI_SLIDER_INT, 3, 1, 9, 1)
