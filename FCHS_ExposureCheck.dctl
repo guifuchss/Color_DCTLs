@@ -1,3 +1,5 @@
+// Created by Guilherme Fuchs
+// www.guifuchs.com
 
 DEFINE_UI_PARAMS(p_Ramp, Ramp, DCTLUI_CHECK_BOX, 1);
 DEFINE_UI_PARAMS(p_MiddleGray, MiddleGray, DCTLUI_CHECK_BOX, 1);
